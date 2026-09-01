@@ -37,7 +37,8 @@ const { state, visibleFiles, files, fileTree } = review
   display: flex;
   flex-direction: column;
   background: var(--bg-subtle);
-  border-right: 1px solid var(--border);
+  /* No border-right: the splitter handle is the seam now, and two adjacent
+     1px lines read as a 2px one. */
   overflow: hidden;
 }
 

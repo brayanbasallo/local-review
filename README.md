@@ -46,6 +46,9 @@ launched.
   name/extension filter.
 - **Side-by-side diff** — Monaco, read-only, syntax-highlighted, language
   detected from the path.
+- **Resizable panes** — drag the seam between the file tree and the diff (or
+  focus it and use the arrow keys); the width is remembered across reloads. The
+  original|modified boundary inside the diff drags independently.
 - **Viewed tracking** — a checkbox per file. Reviewed files dim but stay
   reachable, and the state survives a reload (`localStorage`, scoped per repo
   and per comparison).

@@ -3,6 +3,16 @@ import { monaco, languageForPath } from './setup.js'
 
 const EDITOR_OPTIONS = {
   renderSideBySide: true,
+  /**
+   * Monaco falls back to the unified view whenever the diff is narrower than
+   * `renderSideBySideInlineBreakpoint` (900px). Reasonable on its own, but it
+   * turns dragging the sidebar wider into a silent switch away from the
+   * side-by-side view this tool exists to show — and the original|modified
+   * divider disappears with it, since a unified view has nothing to split.
+   */
+  useInlineViewWhenSpaceIsLimited: false,
+  /** Makes the original|modified boundary draggable. */
+  enableSplitViewResizing: true,
   readOnly: true,
   originalEditable: false,
   automaticLayout: true,

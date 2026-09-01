@@ -84,12 +84,50 @@ select {
 }
 
 .app-body {
-  display: grid;
-  grid-template-columns: 320px 1fr;
   min-height: 0;
 }
 
-.app-body > * {
-  min-height: 0;
+/* The splitter sizes the panes; each pane just has to let its single child
+   fill it and refuse to be forced wider by its own content. */
+.pane {
+  display: flex;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Drawn as a hairline so it reads as the seam between panes rather than a
+   control, and lights up only when it is being touched. */
+.handle {
+  flex: none;
+  position: relative;
+  width: 1px;
+  background: var(--border);
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+/* reka's own hover state, not CSS `:hover`: it accounts for `hitAreaMargins`,
+   so the seam lights up across the whole grab area rather than only over the
+   1px that is drawn. `data-state` is inactive | hover | drag. */
+.handle[data-state='hover']::after,
+.handle[data-state='drag']::after {
+  background: var(--accent);
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
