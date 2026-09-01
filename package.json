@@ -1,0 +1,30 @@
+{
+  "name": "llm-review",
+  "version": "1.0.0",
+  "description": "Local PR reviewer — audit LLM-generated commits in a GitHub-like diff UI without leaving your machine",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "llm-review": "bin/llm-review.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "ui/dist"
+  ],
+  "scripts": {
+    "dev:api": "node bin/llm-review.js --no-open --port 3000",
+    "dev:ui": "vite --config ui/vite.config.js",
+    "build": "vite build --config ui/vite.config.js",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "monaco-editor": "^0.52.2",
+    "reka-ui": "^2.10.4",
+    "vite": "^6.0.7",
+    "vue": "^3.5.13"
+  }
+}
