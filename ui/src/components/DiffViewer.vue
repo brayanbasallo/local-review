@@ -10,7 +10,7 @@ const review = useReview()
 const { state, selectedFile } = review
 
 const container = ref(null)
-const { show, clear, changedModifiedLines } = useDiffEditor(container)
+const { show, clear, changedModifiedLines, modifiedValue } = useDiffEditor(container)
 
 const placeholder = shallowRef(null)
 const lastSwapMs = shallowRef(null)
@@ -86,6 +86,23 @@ async function render(file) {
 }
 
 watch(selectedFile, render, { immediate: true })
+
+/**
+ * A refresh that found no structural change still has to answer: did the file
+ * I am looking at change underneath me? Compare against what the editor
+ * actually holds rather than re-rendering blindly — re-rendering would throw
+ * away the scroll position on every single tab-back.
+ */
+watch(
+  () => state.refreshTick,
+  async () => {
+    const file = selectedFile.value
+    if (!file || file.isBinary || placeholder.value) return
+
+    const compare = await review.contentFor(file.path, 'compare')
+    if (compare.content !== modifiedValue()) render(file)
+  },
+)
 
 // Exposed so an end-to-end run can assert the sub-200ms swap budget.
 watch(lastSwapMs, (value) => {

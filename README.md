@@ -57,6 +57,10 @@ launched.
 - **Resizable panes** — drag the seam between the file tree and the diff (or
   focus it and use the arrow keys); the width is remembered across reloads. The
   original|modified boundary inside the diff drags independently.
+- **Refreshes when you come back to the tab.** Alt-tab to your editor, let the
+  agent write, come back — the file list, counts and open diff catch up on their
+  own. A refresh that finds nothing changed does nothing at all, so it never
+  costs you your scroll position or your place in the review.
 - **Viewed tracking** — a checkbox per file. Reviewed files dim but stay
   reachable, and the state survives a reload (`localStorage`, scoped per repo
   and per comparison).
@@ -185,6 +189,26 @@ tokenizers as the diff, so a fence looks identical either side of the toggle,
 and no second highlighting library. Fence words are resolved through Monaco's
 alias registry: ```` ```ts ```` is an alias, `typescript` is the id, and
 colourising by the raw word yields an empty block.
+
+### Refresh on focus
+
+Two listeners, and neither is redundant. `visibilitychange` covers switching
+tabs inside the browser; `window.focus` covers switching applications — a
+background browser window whose front tab is this one still reports
+`visibilityState === 'visible'`, so visibilitychange alone never fires for the
+app-switch case, which is the common one here.
+
+Refreshing naively would be worse than not refreshing: a new changeset object
+means a new `selectedFile` identity, which re-renders the diff and throws away
+your scroll position on every tab-back. So the changeset is only applied when a
+signature — the two resolved SHAs plus every file's status, counts and path —
+actually differs. Selection, folding and viewed state survive either way.
+
+That signature deliberately cannot see an edit that leaves the line counts
+alone, which is a normal thing for a typo fix. For that case the refresh bumps a
+counter, and the viewer re-fetches the open file and compares it against what
+the Monaco model already holds — re-rendering only on a real difference rather
+than guessing.
 
 ### Performance
 

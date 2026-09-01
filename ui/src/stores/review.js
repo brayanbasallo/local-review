@@ -16,6 +16,9 @@ const state = reactive({
   // Holds CLOSED folders, so an empty set means "everything open" and the
   // default needs no initialisation pass.
   collapsed: new Set(),
+  // Bumped by a refresh that found no structural change, so views can
+  // re-validate the content they are displaying.
+  refreshTick: 0,
   loading: false,
   error: null,
   closed: false,
@@ -117,6 +120,57 @@ async function loadChanges() {
   }
 }
 
+/**
+ * Changes only when the changeset materially changed — the two resolved SHAs
+ * plus every file's identity and counts. Comparing this instead of blindly
+ * replacing the changeset is what keeps a refresh from re-rendering the diff,
+ * and losing your scroll position, every time you tab back.
+ */
+const changesetSignature = (changeset) =>
+  changeset &&
+  [
+    changeset.baseSha,
+    changeset.compareSha,
+    ...changeset.files.map((f) => `${f.status} ${f.added} ${f.deleted} ${f.isBinary} ${f.path}`),
+  ].join('\n')
+
+/**
+ * Re-reads the comparison without disturbing the session.
+ *
+ * Selection, folding and viewed state all survive: you came back to where you
+ * were, and a refresh that scrolled you to the top of the first file would be
+ * worse than no refresh at all.
+ */
+async function refresh() {
+  if (!state.baseRef || !state.compareRef || state.closed) return
+
+  try {
+    const next = await api.changes(state.baseRef, state.compareRef)
+
+    if (changesetSignature(next) === changesetSignature(state.changeset)) {
+      // Same file list and same counts — but for a volatile comparison a file
+      // can be edited without either moving, so views re-validate what they
+      // are showing. This is the only re-render path in this branch.
+      state.refreshTick += 1
+      return
+    }
+
+    clearContentCache()
+    state.changeset = next
+    state.viewed = loadViewed()
+
+    // Only move the cursor if what it pointed at is gone.
+    if (!next.files.some((file) => file.path === state.selectedPath)) {
+      state.selectedPath = orderedFiles.value[0]?.path ?? null
+    }
+    // Applying a new changeset already re-renders through `selectedFile`, so
+    // the tick is deliberately not bumped here — that would render twice.
+  } catch {
+    // A refresh is opportunistic. Failing it must never replace what is on
+    // screen with an error message.
+  }
+}
+
 function contentFor(path, side) {
   return api.content(state.baseRef, state.compareRef, path, side)
 }
@@ -207,6 +261,7 @@ export function useReview() {
 
     loadRefs,
     loadChanges,
+    refresh,
     contentFor,
     toggleViewed,
     selectNextUnviewed,

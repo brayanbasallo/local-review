@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
 import { useReview } from './stores/review.js'
 import TopBar from './components/TopBar.vue'
@@ -9,7 +9,34 @@ import DiffViewer from './components/DiffViewer.vue'
 const review = useReview()
 const { state, progress } = review
 
-onMounted(review.loadRefs)
+/**
+ * Re-read the comparison whenever attention comes back to the page. The real
+ * loop this serves is alt-tabbing between an editor (or an agent) and this
+ * window, so BOTH events are needed and neither is redundant:
+ *
+ * - `visibilitychange` covers switching tabs inside the browser.
+ * - `window.focus` covers switching applications. A background browser window
+ *   whose front tab is this one still reports `visibilityState === 'visible'`,
+ *   so visibilitychange alone never fires for the app-switch case — the most
+ *   common one here.
+ *
+ * `refresh()` is a no-op when nothing changed, so firing twice costs one git
+ * call and disturbs nothing.
+ */
+const refreshIfVisible = () => {
+  if (document.visibilityState === 'visible') review.refresh()
+}
+
+onMounted(() => {
+  review.loadRefs()
+  document.addEventListener('visibilitychange', refreshIfVisible)
+  window.addEventListener('focus', refreshIfVisible)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', refreshIfVisible)
+  window.removeEventListener('focus', refreshIfVisible)
+})
 </script>
 
 <template>

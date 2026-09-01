@@ -118,6 +118,9 @@ export function useDiffEditor(containerRef) {
     return lines
   }
 
+  /** What the modified pane currently holds, for staleness checks. */
+  const modifiedValue = () => models?.modified.getValue() ?? null
+
   function clear() {
     editor.value?.setModel(null)
     models?.original.dispose()
@@ -125,5 +128,5 @@ export function useDiffEditor(containerRef) {
     models = null
   }
 
-  return { editor, show, clear, changedModifiedLines }
+  return { editor, show, clear, changedModifiedLines, modifiedValue }
 }
