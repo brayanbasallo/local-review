@@ -30,6 +30,10 @@ launched.
   each take any branch plus two virtual targets: `Working Tree (uncommitted)`
   and `Staged (index)`. Opens on `current branch ← working tree`, since
   uncommitted work is the usual case.
+- **Untracked files included** in the working-tree comparison. `git diff` only
+  reports tracked paths, so a brand-new file stays invisible to it until someone
+  runs `git add` — and a brand-new file is the most common thing an LLM leaves
+  behind. `.gitignore` is still respected.
 - **Remote-tracking branches as a base** — `origin/main` alongside your local
   `main`. When the local branch has fallen behind, its merge-base is not the
   one a real pull request would use, so the diff shows work that is already
@@ -78,7 +82,7 @@ a process; the UI never sees a revision string beyond an opaque token.
 ```
 bin/llm-review.js       thin entry
 src/cli/                repo guard, port finder, browser, signal handling
-src/git/                exec · refs · changes · content     <- only Git seam
+src/git/                exec · refs · changes · content · untracked  <- only Git seam
 src/api/                http server, 4 routes, static serving
 src/shared/             virtual-ref sentinels, shared with the UI over the API
 ui/src/tree/            paths -> directory tree (pure, no Vue)

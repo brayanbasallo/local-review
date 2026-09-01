@@ -1,6 +1,14 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { WORKING_TREE, STAGED } from '../shared/virtual-refs.js'
+
+/**
+ * Matches the execFile maxBuffer that caps reads through `git show`, so both
+ * paths refuse the same sizes. This became reachable once untracked files
+ * entered the changeset: a stray build artifact or video that .gitignore does
+ * not cover would otherwise be read whole into memory.
+ */
+const MAX_FILE_BYTES = 50 * 1024 * 1024
 
 export const ContentState = {
   OK: 'ok',
@@ -43,7 +51,12 @@ export function createContentReader(git) {
 
   async function fromWorkingTree(path) {
     try {
-      return classify(await readFile(join(git.cwd, path), 'utf8'))
+      const fullPath = join(git.cwd, path)
+
+      const { size } = await stat(fullPath)
+      if (size > MAX_FILE_BYTES) return oversize()
+
+      return classify(await readFile(fullPath, 'utf8'))
     } catch (error) {
       if (error.code === 'ENOENT' || error.code === 'EISDIR') return absent()
       throw error

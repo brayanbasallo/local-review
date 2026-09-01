@@ -1,4 +1,5 @@
 import { WORKING_TREE, STAGED, isVirtualRef } from '../shared/virtual-refs.js'
+import { createUntrackedReader } from './untracked.js'
 
 export class InvalidRefError extends Error {
   constructor(ref) {
@@ -71,6 +72,8 @@ function parseNameStatus(stdout) {
 }
 
 export function createChangesReader(git, refs) {
+  const { untrackedEntries } = createUntrackedReader(git)
+
   /**
    * Resolves which two snapshots to compare, and the exact `git diff`
    * arguments that compare them.
@@ -108,18 +111,25 @@ export function createChangesReader(git, refs) {
   async function listChanges(baseRef, compareRef) {
     const comparison = await resolveComparison(baseRef, compareRef)
 
-    const [numstatOut, nameStatusOut] = await Promise.all([
+    const [numstatOut, nameStatusOut, untracked] = await Promise.all([
       git(['diff', '--numstat', '-z', '-M', ...comparison.diffArgs]),
       git(['diff', '--name-status', '-z', '-M', ...comparison.diffArgs]),
+      // Only for the working tree. STAGED means "what is in the index", and an
+      // untracked file is by definition not in it.
+      compareRef === WORKING_TREE ? untrackedEntries() : [],
     ])
 
     const stats = parseNumstat(numstatOut)
 
     // name-status drives the order and identity; numstat only adds counts.
-    const files = parseNameStatus(nameStatusOut).map((entry) => {
+    const tracked = parseNameStatus(nameStatusOut).map((entry) => {
       const stat = stats.get(entry.path) ?? { added: 0, deleted: 0, isBinary: false }
       return { ...entry, ...stat }
     })
+
+    // Git lists a diff sorted by path; keep the merged set consistent with that
+    // rather than dropping the new files in a clump at the end.
+    const files = [...tracked, ...untracked].sort((a, b) => a.path.localeCompare(b.path))
 
     return {
       baseRef,
