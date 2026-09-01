@@ -50,6 +50,10 @@ launched.
   name/extension filter.
 - **Side-by-side diff** — Monaco, read-only, syntax-highlighted, language
   detected from the path.
+- **Markdown renders, with the changed blocks marked.** `.md` files open as the
+  rendered document; a `Source | Rendered` toggle switches back. Marking is what
+  makes rendering safe here: a plain preview would let you read a document
+  straight past the paragraph the LLM rewrote.
 - **Resizable panes** — drag the seam between the file tree and the diff (or
   focus it and use the arrow keys); the width is remembered across reloads. The
   original|modified boundary inside the diff drags independently.
@@ -86,6 +90,7 @@ src/git/                exec · refs · changes · content · untracked  <- only
 src/api/                http server, 4 routes, static serving
 src/shared/             virtual-ref sentinels, shared with the UI over the API
 ui/src/tree/            paths -> directory tree (pure, no Vue)
+ui/src/markdown/        markdown -> HTML with changed blocks (pure, no Vue)
 ui/src/                 Vue 3 + Monaco + reka-ui (headless combobox only)
 ```
 
@@ -147,6 +152,39 @@ carpet a read-only diff with phantom "cannot find module" errors, and the first
 TypeScript file opened cost ~230ms loading `tsMode` and syncing models into a
 worker. Dropping them removed that outlier — worst-case file switch went from
 232ms to 39ms — with no loss of syntax colouring.
+
+### Rendered markdown
+
+The marks are not a second diff. markdown-it block tokens carry
+`map: [startLine, endLine]`, and Monaco has already computed which lines
+changed, so crossing the two is all it takes — no diffing logic of its own.
+
+Reading `getLineChanges()` needs care: it keeps returning the PREVIOUS file's
+result until the worker lands, so a non-null check is not enough to know the
+answer belongs to the file on screen. `useDiffEditor` therefore builds a fresh
+promise inside every `setModel()` call and resolves it on `onDidUpdateDiff`,
+which makes staleness impossible rather than unlikely.
+
+Only blocks that read as a unit are marked — paragraph, heading, list item,
+table row, blockquote, fence. Marking a list container would tint the whole list
+because one bullet changed, which buries the signal it was meant to show.
+
+The editor stays mounted and modelled while hidden, because it is the thing
+computing that diff.
+
+Raw HTML is escaped, not executed (`html: false`, markdown-it's default). This
+renders files from a repository being audited precisely because it is not
+trusted. markdown-it also neutralises `javascript:`, `vbscript:`, `file:` and
+`data:` URLs, and links get `rel="noopener noreferrer"` so a click cannot take
+the session with it. Relative images 404 by design: serving them would mean
+exposing arbitrary repository files over HTTP, weakening the per-changeset
+whitelist that guards `/api/content`.
+
+Code fences are coloured by `monaco.editor.colorize` — same theme and same 82
+tokenizers as the diff, so a fence looks identical either side of the toggle,
+and no second highlighting library. Fence words are resolved through Monaco's
+alias registry: ```` ```ts ```` is an alias, `typescript` is the id, and
+colourising by the raw word yields an empty block.
 
 ### Performance
 

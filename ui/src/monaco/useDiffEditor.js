@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
-import { monaco, languageForPath } from './setup.js'
+import { monaco, languageForPath, activeTheme } from './setup.js'
 
 const EDITOR_OPTIONS = {
   renderSideBySide: true,
@@ -40,8 +40,18 @@ export function useDiffEditor(containerRef) {
   const editor = shallowRef(null)
   let models = null
 
+  /**
+   * Resolves once Monaco has computed the diff for the CURRENT models.
+   *
+   * Recreated on every `show()`, and that is the whole point: `getLineChanges()`
+   * keeps returning the PREVIOUS file's result until the worker lands, so a
+   * non-null check is not enough to know the answer belongs to this file. Tying
+   * the promise to the setModel call makes staleness impossible.
+   */
+  let diffComputed = Promise.resolve()
+
   onMounted(() => {
-    monaco.editor.setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs')
+    monaco.editor.setTheme(activeTheme())
     editor.value = monaco.editor.createDiffEditor(containerRef.value, EDITOR_OPTIONS)
   })
 
@@ -65,6 +75,17 @@ export function useDiffEditor(containerRef) {
 
     editor.value.setModel(next)
 
+    diffComputed = new Promise((resolve) => {
+      const subscription = editor.value.onDidUpdateDiff(() => {
+        subscription.dispose()
+        resolve()
+      })
+
+      // If the event never arrives, callers get an empty change set and the
+      // markdown renders without marks — degraded, but never a blank pane.
+      setTimeout(resolve, 2000)
+    })
+
     // Dispose only after the editor has let go of them — disposing an
     // attached model throws inside Monaco.
     models?.original.dispose()
@@ -74,6 +95,29 @@ export function useDiffEditor(containerRef) {
     return performance.now() - startedAt
   }
 
+  /**
+   * One-based line numbers that changed on the MODIFIED side.
+   *
+   * Entries with `modifiedEndLineNumber === 0` are pure deletions: there is
+   * nothing on this side to point at, so they are dropped.
+   */
+  async function changedModifiedLines() {
+    if (!editor.value) return new Set()
+
+    await diffComputed
+
+    const lines = new Set()
+    for (const change of editor.value.getLineChanges() ?? []) {
+      if (change.modifiedEndLineNumber === 0) continue
+
+      for (let line = change.modifiedStartLineNumber; line <= change.modifiedEndLineNumber; line += 1) {
+        lines.add(line)
+      }
+    }
+
+    return lines
+  }
+
   function clear() {
     editor.value?.setModel(null)
     models?.original.dispose()
@@ -81,5 +125,5 @@ export function useDiffEditor(containerRef) {
     models = null
   }
 
-  return { editor, show, clear }
+  return { editor, show, clear, changedModifiedLines }
 }

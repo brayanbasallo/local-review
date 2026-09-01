@@ -34,6 +34,7 @@ self.MonacoEnvironment = {
 function buildLanguageIndex() {
   const byExtension = new Map()
   const byFilename = new Map()
+  const byAlias = new Map()
 
   for (const language of monaco.languages.getLanguages()) {
     for (const extension of language.extensions ?? []) {
@@ -42,10 +43,24 @@ function buildLanguageIndex() {
     for (const filename of language.filenames ?? []) {
       byFilename.set(filename.toLowerCase(), language.id)
     }
+    // A fence says ```ts, but Monaco's id is `typescript` and `ts` is only an
+    // alias. Colourising by the raw fence word silently yields nothing.
+    byAlias.set(language.id.toLowerCase(), language.id)
+    for (const alias of language.aliases ?? []) {
+      byAlias.set(alias.toLowerCase(), language.id)
+    }
   }
 
-  return { byExtension, byFilename }
+  return { byExtension, byFilename, byAlias }
 }
+
+/**
+ * One source of truth for which Monaco theme is in play: the diff editor and
+ * the markdown fence colouriser have to agree, or a fence would change colour
+ * across the Source/Rendered toggle.
+ */
+export const activeTheme = () =>
+  matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs'
 
 let languageIndex = null
 
@@ -60,6 +75,17 @@ export function languageForPath(path) {
     (dot > 0 ? languageIndex.byExtension.get(filename.slice(dot)) : null) ??
     'plaintext'
   )
+}
+
+/**
+ * Resolves whatever word a code fence used (```ts, ```TypeScript, ```typescript)
+ * to a real Monaco language id, or null when nothing matches.
+ */
+export function languageForAlias(alias) {
+  if (!alias) return null
+
+  languageIndex ??= buildLanguageIndex()
+  return languageIndex.byAlias.get(alias.toLowerCase()) ?? null
 }
 
 export { monaco }

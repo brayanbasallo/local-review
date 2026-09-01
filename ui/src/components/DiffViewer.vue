@@ -1,16 +1,34 @@
 <script setup>
-import { ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useReview } from '../stores/review.js'
 import { useDiffEditor } from '../monaco/useDiffEditor.js'
+import { languageForPath } from '../monaco/setup.js'
+import { renderMarkdown } from '../markdown/render-markdown.js'
+import MarkdownView from './MarkdownView.vue'
 
 const review = useReview()
 const { state, selectedFile } = review
 
 const container = ref(null)
-const { show, clear } = useDiffEditor(container)
+const { show, clear, changedModifiedLines } = useDiffEditor(container)
 
 const placeholder = shallowRef(null)
 const lastSwapMs = shallowRef(null)
+
+const isMarkdown = computed(
+  () => Boolean(selectedFile.value) && languageForPath(selectedFile.value.path) === 'markdown',
+)
+
+/**
+ * Sticky for the session but not persisted, like the tree's collapse state:
+ * it is a view mode, and a predictable default matters more than remembering.
+ * Rendered is the default because reading the document is the point — the
+ * changed-block marks are what make that safe.
+ */
+const preferRendered = ref(true)
+const showRendered = computed(() => isMarkdown.value && preferRendered.value)
+
+const markdownHtml = shallowRef('')
 
 const PLACEHOLDERS = {
   binary: 'Binary file — not shown.',
@@ -54,6 +72,17 @@ async function render(file) {
 
   placeholder.value = null
   lastSwapMs.value = show({ path: file.path, original: base.content, modified: compare.content })
+
+  // The editor stays modelled even when hidden: it is what computes the diff
+  // the marks are derived from.
+  if (languageForPath(file.path) === 'markdown') {
+    const changedLines = await changedModifiedLines()
+    if (token !== requestToken) return
+
+    markdownHtml.value = renderMarkdown(compare.content, { changedLines })
+  } else {
+    markdownHtml.value = ''
+  }
 }
 
 watch(selectedFile, render, { immediate: true })
@@ -75,6 +104,12 @@ watch(lastSwapMs, (value) => {
       </span>
 
       <span class="header-meta">
+        <!-- Only for markdown; every other file type keeps the header it had. -->
+        <span v-if="isMarkdown" class="mode" role="group" aria-label="Markdown view mode">
+          <button :class="{ on: !preferRendered }" @click="preferRendered = false">Source</button>
+          <button :class="{ on: preferRendered }" @click="preferRendered = true">Rendered</button>
+        </span>
+
         <span v-if="!selectedFile.isBinary" class="counts mono">
           <span class="stat-added">+{{ selectedFile.added }}</span>
           <span class="stat-deleted">-{{ selectedFile.deleted }}</span>
@@ -96,9 +131,17 @@ watch(lastSwapMs, (value) => {
     <p v-else-if="!selectedFile" class="notice">Select a file to review.</p>
     <p v-else-if="placeholder" class="notice">{{ placeholder }}</p>
 
-    <!-- Kept mounted at all times: the DiffEditor instance must never be
-         torn down and rebuilt, or file switching costs half a second. -->
-    <div v-show="selectedFile && !placeholder && !state.error" ref="container" class="editor" />
+    <MarkdownView v-if="showRendered && !placeholder && !state.error" :html="markdownHtml" />
+
+    <!-- Kept mounted at all times: the DiffEditor instance must never be torn
+         down and rebuilt, or file switching costs half a second — and in
+         rendered mode it is still the thing computing the diff the marks come
+         from, so it stays modelled while hidden. -->
+    <div
+      v-show="selectedFile && !placeholder && !state.error && !showRendered"
+      ref="container"
+      class="editor"
+    />
   </section>
 </template>
 
@@ -108,6 +151,42 @@ watch(lastSwapMs, (value) => {
   flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+}
+
+.viewer > :deep(.markdown) {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Segmented control: one border around the pair, a divider between them. */
+.mode {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode button {
+  padding: 3px 10px;
+  background: var(--bg);
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.mode button + button {
+  border-left: 1px solid var(--border);
+}
+
+.mode button:hover {
+  color: var(--fg);
+}
+
+.mode button.on {
+  background: var(--accent);
+  color: #fff;
 }
 
 .file-header {
