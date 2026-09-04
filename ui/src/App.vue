@@ -6,6 +6,9 @@ import TopBar from './components/TopBar.vue'
 import SidebarTree from './components/SidebarTree.vue'
 import DiffViewer from './components/DiffViewer.vue'
 
+/** Frozen and module-level on purpose — see the handle in the template. */
+const HIT_AREA = Object.freeze({ coarse: 10, fine: 6 })
+
 const review = useReview()
 const { state, progress } = review
 
@@ -65,8 +68,13 @@ onBeforeUnmount(() => {
       </SplitterPanel>
 
       <!-- A hairline divider that is hard to grab is its own kind of bug, so
-           the hit area is widened well past the 1px that is drawn. -->
-      <SplitterResizeHandle class="handle" :hit-area-margins="{ coarse: 10, fine: 6 }" />
+           the hit area is widened well past the 1px that is drawn.
+
+           HIT_AREA is a module constant, NOT an inline object literal. reka
+           registers the handle inside a watchEffect that depends on this prop,
+           so a fresh object on every render tears the handle down and re-registers
+           it — mid-drag, which drops the rest of the gesture. -->
+      <SplitterResizeHandle class="handle" :hit-area-margins="HIT_AREA" />
 
       <SplitterPanel class="pane" :min-size="20">
         <DiffViewer />
