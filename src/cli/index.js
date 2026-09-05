@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openRepository } from '../git/index.js'
@@ -10,25 +11,32 @@ import { installLifecycle } from './lifecycle.js'
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const DEFAULT_PORT = 3000
 
+// The manifest is the single source of truth for the version — CI bumps it and
+// nothing else restates the number. npm always ships package.json inside the
+// tarball, so this read is as safe from an install as it is from a checkout.
+const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')).version
+
 const USAGE = `
   llm-review — review a Git diff in a local GitHub-style PR UI
 
   Usage:  llm-review [options]
 
   Options:
-    --port <n>    Preferred port (default: ${DEFAULT_PORT}; the next free one is used if taken)
-    --no-open     Do not launch the browser
-    -h, --help    Show this help
+    --port <n>       Preferred port (default: ${DEFAULT_PORT}; the next free one is used if taken)
+    --no-open        Do not launch the browser
+    -v, --version    Show the version
+    -h, --help       Show this help
 `
 
 function parseArgs(argv) {
-  const options = { port: DEFAULT_PORT, open: true, help: false }
+  const options = { port: DEFAULT_PORT, open: true, help: false, version: false }
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
 
     if (arg === '--no-open') options.open = false
     else if (arg === '-h' || arg === '--help') options.help = true
+    else if (arg === '-v' || arg === '--version') options.version = true
     else if (arg === '--port') {
       const port = Number(argv[i + 1])
       if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -63,8 +71,15 @@ export async function run(argv = process.argv.slice(2)) {
     return
   }
 
+  // Both answer from the manifest alone, so they run before the repository
+  // guards: asking a tool its version must not require standing in a repo.
   if (options.help) {
     console.log(USAGE)
+    return
+  }
+
+  if (options.version) {
+    console.log(VERSION)
     return
   }
 

@@ -68,12 +68,16 @@ const baseStaleTitle = computed(() => {
 const allViewed = computed(
   () => progress.value.total > 0 && progress.value.viewed === progress.value.total,
 )
+
+/** Injected by Vite from package.json — see `define` in ui/vite.config.js. */
+const version = __APP_VERSION__
 </script>
 
 <template>
   <header class="topbar">
     <div class="brand">
       <span class="brand-name">llm-review</span>
+      <span class="version mono">v{{ version }}</span>
       <span class="repo mono" :title="state.repoPath">{{ state.repoPath.split('/').pop() }}</span>
     </div>
 
@@ -138,6 +142,15 @@ const allViewed = computed(
 .brand-name {
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/* Metadata weight, matching .repo: the version identifies the build, it does
+   not compete with the product name for the eye. `flex-shrink: 0` keeps it
+   whole when a long repo path squeezes the row. */
+.version {
+  font-size: 12px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
 }
 
 .repo {

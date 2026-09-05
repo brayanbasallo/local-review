@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# One release at a time: a second push while the first is still tagging would
+# compute its version from a history that is about to move under it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the release commit and the tag
+  packages: write # publish to GitHub Packages
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # semantic-release derives the next version from the full history and
+          # the existing tags; a shallow clone would restart at 1.0.0 every run.
+          fetch-depth: 0
+          # @semantic-release/git pushes with its own token, not the checkout's.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@brayanbasallo'
+
+      # No explicit build step: the `prepare` script runs the Vite build, and
+      # `npm publish` fires it after the version bump has landed in package.json
+      # — so the UI is compiled with the version it is about to be released as.
+      - run: npm ci
+
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NODE_AUTH_TOKEN fills the .npmrc setup-node wrote; NPM_TOKEN is the
+          # fallback @semantic-release/npm reaches for if it cannot resolve auth
+          # from that file. Same token either way — one of the two always wins.
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}

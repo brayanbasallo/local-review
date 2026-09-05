@@ -1,7 +1,13 @@
 {
-  "name": "llm-review",
+  "name": "@brayanbasallo/llm-review",
   "version": "1.0.0",
   "description": "Local PR reviewer — audit LLM-generated commits in a GitHub-like diff UI without leaving your machine",
+  "license": "MIT",
+  "author": "Brayan Basallo <basallo17@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brayanbasallo/local-review.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -14,17 +20,25 @@
     "src",
     "ui/dist"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "dev:api": "node bin/llm-review.js --no-open --port 3000",
     "dev:ui": "vite --config ui/vite.config.js",
     "build": "vite build --config ui/vite.config.js",
+    "release:dry": "semantic-release --dry-run --no-ci",
     "prepare": "npm run build"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@vitejs/plugin-vue": "^5.2.1",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
     "markdown-it": "^15.0.1",
     "monaco-editor": "^0.52.2",
     "reka-ui": "^2.10.4",
+    "semantic-release": "^24.2.3",
     "vite": "^6.0.7",
     "vue": "^3.5.13"
   }

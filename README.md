@@ -13,14 +13,28 @@ Finds a free port, serves the UI, opens your browser. `Ctrl+C` or the
 
 ## Install
 
+From the repository:
+
 ```bash
 npm install && npm link
 ```
 
-`npm link` runs the UI build via `prepare`, so `llm-review` works from any
-directory afterwards. macOS-focused: auto-open uses `open`. Everything else is
-platform-neutral, and the URL is always printed if the browser cannot be
-launched.
+Or from GitHub Packages — which requires authentication even for public
+packages, so the consuming machine needs an `.npmrc`:
+
+```
+@brayanbasallo:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+```bash
+npm install -g @brayanbasallo/llm-review
+```
+
+Either way the binary is `llm-review`. `npm link` runs the UI build via
+`prepare`, so `llm-review` works from any directory afterwards. macOS-focused:
+auto-open uses `open`. Everything else is platform-neutral, and the URL is
+always printed if the browser cannot be launched.
 
 ## What you get
 
@@ -68,10 +82,13 @@ launched.
 ## Options
 
 ```
---port <n>    Preferred port (default 3000; the next free one is used if taken)
---no-open     Do not launch the browser
+--port <n>       Preferred port (default 3000; the next free one is used if taken)
+--no-open        Do not launch the browser
+-v, --version
 -h, --help
 ```
+
+The running version is also shown next to the name in the UI header.
 
 ## Development
 
@@ -81,6 +98,41 @@ Two processes: the API and Vite with an `/api` proxy.
 npm run dev:api   # port 3000
 npm run dev:ui    # port 5173 — open this one
 ```
+
+## Releases
+
+Versioning is automatic. Every push to `main` runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which hands
+the commits to `semantic-release`: it derives the next version, writes
+`CHANGELOG.md`, tags `vX.Y.Z`, opens a GitHub Release and publishes to GitHub
+Packages.
+
+**The commit messages decide the number**, so they are the thing to get right:
+
+| Commit type                          | Bump  |
+| ------------------------------------ | ----- |
+| `fix:`                               | patch |
+| `feat:`                              | minor |
+| `feat!:` / `BREAKING CHANGE:` footer | major |
+| `chore:`, `docs:`, `refactor:`, …    | none  |
+
+A push carrying only non-releasing types runs the workflow and exits without a
+release — that is intended, not a failure.
+
+Never edit `version` in `package.json` by hand; CI owns it, and the release
+commit (`chore(release): …`) carries `[skip ci]` so it does not trigger itself.
+No secrets to configure: the workflow uses the `GITHUB_TOKEN` Actions injects.
+
+To preview what the next push would release:
+
+```bash
+GITHUB_TOKEN=<personal-access-token> npm run release:dry
+```
+
+It writes nothing and publishes nothing. The token is only needed because
+`semantic-release` verifies its credentials up front; add
+`--repository-url git@github.com:brayanbasallo/local-review.git` if you would
+rather authenticate the Git check over SSH.
 
 ## How it works
 
