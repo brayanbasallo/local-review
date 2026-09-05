@@ -1,5 +1,9 @@
 # llm-review
 
+[![Release](https://github.com/brayanbasallo/local-review/actions/workflows/release.yml/badge.svg)](https://github.com/brayanbasallo/local-review/actions/workflows/release.yml)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](package.json)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Review a Git diff in a local, GitHub-style pull-request UI. Built for auditing
 commits an LLM just wrote — without pushing a branch or opening a real PR.
 
@@ -11,30 +15,40 @@ llm-review
 Finds a free port, serves the UI, opens your browser. `Ctrl+C` or the
 **Finish review** button shuts it down and frees the port.
 
+## Requirements
+
+- **Node.js 20 or newer.** The server is ESM-only and uses modern `node:` APIs.
+- **Git on your `PATH`.** Everything is read by shelling out to the real Git;
+  nothing is reimplemented.
+- **A repository with at least one commit** — `llm-review` refuses to start
+  otherwise, because `HEAD` is what every comparison is anchored to.
+
 ## Install
 
-From the repository:
-
 ```bash
-npm install && npm link
+npm install -g @brayanbasallo/llm-review
 ```
 
-Or from GitHub Packages — which requires authentication even for public
-packages, so the consuming machine needs an `.npmrc`:
+GitHub Packages requires authentication even for public packages, so the
+machine installing it needs an `.npmrc`:
 
 ```
 @brayanbasallo:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
+Or from a clone — the path to take if you intend to change anything:
+
 ```bash
-npm install -g @brayanbasallo/llm-review
+npm install && npm link
 ```
 
-Either way the binary is `llm-review`. `npm link` runs the UI build via
-`prepare`, so `llm-review` works from any directory afterwards. macOS-focused:
-auto-open uses `open`. Everything else is platform-neutral, and the URL is
-always printed if the browser cannot be launched.
+Either way the command is `llm-review`. `npm link` runs the UI build via
+`prepare`, so it works from any directory afterwards.
+
+**Auto-open is macOS-only**, because it shells out to `open`. Everything else
+is platform-neutral, and the URL is printed to the terminal regardless — on
+Linux or Windows you click that instead, or pass `--no-open`.
 
 ## What you get
 
@@ -84,55 +98,11 @@ always printed if the browser cannot be launched.
 ```
 --port <n>       Preferred port (default 3000; the next free one is used if taken)
 --no-open        Do not launch the browser
--v, --version
--h, --help
+-v, --version    Print the version and exit
+-h, --help       Print this help and exit
 ```
 
 The running version is also shown next to the name in the UI header.
-
-## Development
-
-Two processes: the API and Vite with an `/api` proxy.
-
-```bash
-npm run dev:api   # port 3000
-npm run dev:ui    # port 5173 — open this one
-```
-
-## Releases
-
-Versioning is automatic. Every push to `main` runs
-[`.github/workflows/release.yml`](.github/workflows/release.yml), which hands
-the commits to `semantic-release`: it derives the next version, writes
-`CHANGELOG.md`, tags `vX.Y.Z`, opens a GitHub Release and publishes to GitHub
-Packages.
-
-**The commit messages decide the number**, so they are the thing to get right:
-
-| Commit type                          | Bump  |
-| ------------------------------------ | ----- |
-| `fix:`                               | patch |
-| `feat:`                              | minor |
-| `feat!:` / `BREAKING CHANGE:` footer | major |
-| `chore:`, `docs:`, `refactor:`, …    | none  |
-
-A push carrying only non-releasing types runs the workflow and exits without a
-release — that is intended, not a failure.
-
-Never edit `version` in `package.json` by hand; CI owns it, and the release
-commit (`chore(release): …`) carries `[skip ci]` so it does not trigger itself.
-No secrets to configure: the workflow uses the `GITHUB_TOKEN` Actions injects.
-
-To preview what the next push would release:
-
-```bash
-GITHUB_TOKEN=<personal-access-token> npm run release:dry
-```
-
-It writes nothing and publishes nothing. The token is only needed because
-`semantic-release` verifies its credentials up front; add
-`--repository-url git@github.com:brayanbasallo/local-review.git` if you would
-rather authenticate the Git check over SSH.
 
 ## How it works
 
@@ -281,3 +251,51 @@ path as hostile input:
 - `/api/content` whitelists the requested path against the changeset itself.
   Nothing outside the current diff is reachable.
 - The server binds to `127.0.0.1` only.
+
+## Development
+
+Two processes: the API and Vite with an `/api` proxy.
+
+```bash
+npm run dev:api   # port 3000
+npm run dev:ui    # port 5173 — open this one
+```
+
+## Releases
+
+Versioning is automatic. Every push to `main` runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which hands
+the commits to `semantic-release`: it derives the next version, writes
+`CHANGELOG.md`, tags `vX.Y.Z`, opens a GitHub Release and publishes to GitHub
+Packages.
+
+**The commit messages decide the number**, so they are the thing to get right:
+
+| Commit type                          | Bump  |
+| ------------------------------------ | ----- |
+| `fix:`                               | patch |
+| `feat:`                              | minor |
+| `feat!:` / `BREAKING CHANGE:` footer | major |
+| `chore:`, `docs:`, `refactor:`, …    | none  |
+
+A push carrying only non-releasing types runs the workflow and exits without a
+release — that is intended, not a failure.
+
+Never edit `version` in `package.json` by hand; CI owns it, and the release
+commit (`chore(release): …`) carries `[skip ci]` so it does not trigger itself.
+No secrets to configure: the workflow uses the `GITHUB_TOKEN` Actions injects.
+
+To preview what the next push would release:
+
+```bash
+GITHUB_TOKEN=<personal-access-token> npm run release:dry
+```
+
+It writes nothing and publishes nothing. The token is only needed because
+`semantic-release` verifies its credentials up front; add
+`--repository-url git@github.com:brayanbasallo/local-review.git` if you would
+rather authenticate the Git check over SSH.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
